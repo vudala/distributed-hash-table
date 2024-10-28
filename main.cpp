@@ -28,7 +28,7 @@ int main()
             cin >> key;
         else
             cin >> trash;
-
+            
         ops.push_back({timestamp, op, index, key});
     }
 
@@ -36,8 +36,6 @@ int main()
         ops.begin(), ops.end(),
         [](Operation a, Operation b){ return a.timestamp < b.timestamp;}
     );
-
-    chord[1] = DHTNode(1, true);
 
     for (Operation op : ops) {
         if (op.op == 'E') {
@@ -47,30 +45,10 @@ int main()
             leave(chord, op.index);
         }
         else if (op.op == 'I') {
-            insert(chord, op.index, key);
+            insert(chord, op.index, op.key);
         }
         else if (op.op == 'L') {
-            lookup(chord, op.index, key);
+            lookup(chord, op.index, op.key, op.timestamp);
         }
-
-        for (auto itr = chord.begin(); itr != chord.end(); itr++) {
-            DHTNode n = (*itr).second;
-
-            cout << n.index << ' ' << n.prev << ' ' << n.next;
-            cout << endl;
-        }
-        cout << endl;
     }
-
-
-    for (auto itr = chord.begin(); itr != chord.end(); itr++) {
-        DHTNode node = (*itr).second;
-        set<unsigned> keys = node.keys;
-        cout << node.index << " : ";
-        for (auto itr1 = keys.begin(); itr1 != keys.end(); itr1++) {
-            cout << (*itr1) << ' ';
-        }
-        cout << endl;
-    }
-    
 }

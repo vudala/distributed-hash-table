@@ -5,11 +5,15 @@
 
 using namespace std;
 
-int log2(int x)
+
+unsigned first = 0;
+unsigned max_index = 0;
+
+unsigned log2(unsigned x)
 {
-    int targetlevel = 0;
+    unsigned targetlevel = 0;
     while (x >>= 1) ++targetlevel;
-    return x;
+    return targetlevel;
 }
 
 unsigned pow2(unsigned power)
@@ -17,58 +21,61 @@ unsigned pow2(unsigned power)
     return 1 << power;
 }
 
-// join
-// leave
-// insert
-// lookup
-
 // Retorna o index do dois nodos entre o index
 pair<unsigned, unsigned> get_bounds(map<unsigned, DHTNode>& chord, unsigned index){
-    map<unsigned, DHTNode>::iterator p_itr;
-    for (auto itr = chord.begin(); itr != chord.end(); itr++) {
-        auto el = *(itr);
-        if (el.first > index) {
-            return {(*p_itr).first, (*itr).first};
+    map<unsigned, DHTNode>::iterator itr;
+    pair<unsigned, DHTNode> el;
+    for (itr = chord.begin(); itr != chord.end(); itr++) {
+        el = (*itr);
+        if (el.first >= index) {
+            return {el.second.prev, el.first};
         }
-        p_itr = itr;
     }
-    return {(*p_itr).first, (*(p_itr)).second.next};
+    return {el.first, el.second.next};
 }
 
 
 void update_fingertb(map<unsigned, DHTNode>& chord)
 {
     for (auto itr = chord.begin(); itr != chord.end(); itr++) {
-        DHTNode n = (*itr).second;
+        DHTNode& n = (*itr).second;
+        for(unsigned i = 0; i < log2(max_index) + 1; i++){
+            auto [a, b] = get_bounds(
+                chord,
+                (n.index + pow2(i)) % pow2(log2(max_index) + 1)
+            );
 
-        for(unsigned i = 0; i < 32; i++){
-            auto [a, b] = get_bounds(chord, n.index + pow2(i));
             n.fingertb[i] = b;
-            //cout << b << ' ' ;
         }
-
-        //cout << endl;
     }
-    //cout << endl;
 }
 
 
 void join(map<unsigned, DHTNode>& chord, unsigned index)
-{   
+{
+    if (index > max_index)
+        max_index = index;
+
+    if (chord.size() == 0) {
+        chord[index] = DHTNode(index, true);
+        first = index;
+        update_fingertb(chord);
+        return;
+    }
+
     // Determina a nova vizinhança do nodo que está entrando
     auto [prev, next] = get_bounds(chord, index);
 
-    cout << prev << ' ' << next << endl;
     DHTNode& prev_node = chord[prev];
     DHTNode& next_node = chord[next];
 
     // Cria o novo nodo
     DHTNode new_node = DHTNode(index, false);
 
-    // Se o vizinho anterior era o ultimo, agora o novo nodo é o ultimo
-    if (prev_node.last) {
-        prev_node.last = false;
-        new_node.last = true;
+    if (next_node.first) {
+        first = index;
+        next_node.first = false;
+        new_node.first = true;
     }
 
     // Atualiza os limites dos nodos
@@ -78,15 +85,12 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
     prev_node.next = index;
     next_node.prev = index;
 
-    new_node.lower_lim = prev + 1;
-    next_node.lower_lim = index + 1;
-
     // Rearranja os valores entre os nodos
     set<unsigned>& keys = next_node.keys;
     vector<unsigned> to_erase = vector<unsigned> (0);
     for (auto itr = keys.begin(); itr != keys.end(); itr++) {
         unsigned x = *(itr);
-        if (x < next_node.lower_lim) {
+        if (x < index + 1) {
             new_node.keys.insert(x);
             to_erase.push_back(x);
         }
@@ -102,25 +106,28 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
 
 
 void leave(map<unsigned, DHTNode>& chord, unsigned index)
-{   
+{
+    if (index == max_index)
+        max_index = chord[max_index].prev;
+
     // Determina a vizinhança do nodo que está entrando
     DHTNode& node = chord[index];
     DHTNode& prev_node = chord[node.prev];
     DHTNode& next_node = chord[node.next];
  
-    // Se o nodo era o ultimo, agora o anterior é o ultimo
-    if (node.last) {
-        prev_node.last = true;
-        node.last = true;
+    // Se o nodo era o primeiro, agora o prox é o primeiro
+    if (node.first) {
+        first = next_node.index;
+        next_node.first = true;
+        node.first = false;
     }
 
     // Atualiza as vizinhanças
     prev_node.next = node.next;
     next_node.prev = node.prev;
 
-    next_node.lower_lim = node.prev + 1;
-
     // Rearranja os valores entre os nodos
+    // TODO: isso aqui ta quebrado
     set<unsigned>& keys = node.keys;
     for (auto itr = keys.begin(); itr != keys.end(); itr++)
         next_node.keys.insert(*itr);
@@ -130,31 +137,85 @@ void leave(map<unsigned, DHTNode>& chord, unsigned index)
     update_fingertb(chord);
 }
 
-
-void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
+void print_ftb(DHTNode& node)
 {
-    // Determina a nova vizinhança do nodo que está entrando
-    auto [prev, next] = get_bounds(chord, key);
-    DHTNode& prev_node = chord[prev];
-    DHTNode& next_node = chord[next];
-
-    if (prev == key)
-        prev_node.keys.insert(key);
-    else
-        next_node.keys.insert(key);
+    cout << '{';
+    unsigned i;
+    for (i = 0; i <= log2(max_index) - 1; i++)
+        cout << node.fingertb[i] << ',';
+    cout << node.fingertb[i] << '}';
 }
 
 
-void lookup(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
+unsigned diff(unsigned a, unsigned b)
 {
-    return;
-    // Determina a nova vizinhança do nodo que está entrando
-    auto [prev, next] = get_bounds(chord, key);
-    DHTNode& prev_node = chord[prev];
-    DHTNode& next_node = chord[next];
+    return (a > b) ? a - b : b - a;
+}
 
-    // if (prev == key)
-    //     prev_node.keys.insert(key);
-    // else
-    //     next_node.keys.insert(key);
+unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
+{
+    DHTNode node = chord[index];
+
+    unsigned min_diff = 0xFFFFFFFF;
+    unsigned k = 0;
+
+    for (unsigned i = 0; i < (log2(max_index) + 1); i++) {
+        unsigned d = diff(key, node.fingertb[i]);
+        if (d < min_diff) {
+            min_diff = d;
+            k = i;
+        }
+    };
+
+    return node.fingertb[k];
+}
+
+
+bool belongs_to(map<unsigned, DHTNode>& chord, unsigned target, unsigned key)
+{
+    DHTNode node = chord[target];
+
+    if (node.first && node.prev < key)
+        return true;
+
+    return node.index >= key;
+}
+
+void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
+{
+    if (key > max_index)
+        max_index = key;
+
+    update_fingertb(chord);
+
+    unsigned target = index;
+    while(!belongs_to(chord, target, key)) {
+        target = get_entry(chord, target, key);
+    }
+
+    chord[target].keys.insert(key);
+}
+
+
+void lookup(map<unsigned, DHTNode>& chord, unsigned index, unsigned key, unsigned timestamp)
+{
+    vector<unsigned> jumps;
+    unsigned target = index;
+    jumps.push_back(target);
+    while(!belongs_to(chord, target, key)) {
+        target = get_entry(chord, target, key);
+        jumps.push_back(target);
+    }
+
+    cout << timestamp << " L " << key << " " << '{';
+    unsigned i;
+    for (i = 0; i < jumps.size() - 1; i++)
+        cout << jumps[i] << ',';
+    cout << jumps[i] << '}' << endl;
+
+    for (unsigned j : jumps) {
+        cout << timestamp << " T " << j << ' ';
+        print_ftb(chord[j]);
+        cout << endl;
+    }
 }
