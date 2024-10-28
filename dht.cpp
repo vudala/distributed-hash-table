@@ -11,9 +11,9 @@ unsigned max_index = 0;
 
 unsigned log2(unsigned x)
 {
-    unsigned targetlevel = 0;
-    while (x >>= 1) ++targetlevel;
-    return targetlevel;
+    unsigned target = 0;
+    while (x >>= 1) target++;
+    return target;
 }
 
 unsigned pow2(unsigned power)
@@ -22,7 +22,8 @@ unsigned pow2(unsigned power)
 }
 
 // Retorna o index do dois nodos entre o index
-pair<unsigned, unsigned> get_bounds(map<unsigned, DHTNode>& chord, unsigned index){
+pair<unsigned, unsigned> get_bounds(map<unsigned, DHTNode>& chord, unsigned index)
+{
     map<unsigned, DHTNode>::iterator itr;
     pair<unsigned, DHTNode> el;
     for (itr = chord.begin(); itr != chord.end(); itr++) {
@@ -34,7 +35,7 @@ pair<unsigned, unsigned> get_bounds(map<unsigned, DHTNode>& chord, unsigned inde
     return {el.first, el.second.next};
 }
 
-
+// Atualiza a finger table de um nodo
 void update_fingertb(map<unsigned, DHTNode>& chord)
 {
     for (auto itr = chord.begin(); itr != chord.end(); itr++) {
@@ -95,22 +96,22 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
             to_erase.push_back(x);
         }
     }
-
     for (auto x : to_erase)
         keys.erase(x);
 
+    // Adiciona o nodo na rede
     chord[index] = new_node;
-
     update_fingertb(chord);
 }
 
 
 void leave(map<unsigned, DHTNode>& chord, unsigned index)
 {
+    // Se é o maior nodo que está saindo, o anterior a ele agora é o maior
     if (index == max_index)
         max_index = chord[max_index].prev;
 
-    // Determina a vizinhança do nodo que está entrando
+    // Determina a vizinhança do nodo que está saindo
     DHTNode& node = chord[index];
     DHTNode& prev_node = chord[node.prev];
     DHTNode& next_node = chord[node.next];
@@ -127,15 +128,15 @@ void leave(map<unsigned, DHTNode>& chord, unsigned index)
     next_node.prev = node.prev;
 
     // Rearranja os valores entre os nodos
-    // TODO: isso aqui ta quebrado
     set<unsigned>& keys = node.keys;
     for (auto itr = keys.begin(); itr != keys.end(); itr++)
         next_node.keys.insert(*itr);
 
+    // Apaga ele da rede
     chord.erase(index);
-
     update_fingertb(chord);
 }
+
 
 void print_ftb(DHTNode& node)
 {
@@ -146,12 +147,13 @@ void print_ftb(DHTNode& node)
     cout << node.fingertb[i] << '}';
 }
 
-
+// Retorna diferença absoluta
 unsigned diff(unsigned a, unsigned b)
 {
     return (a > b) ? a - b : b - a;
 }
 
+// Retorna o indice mais proximo de key na fingertb
 unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
 {
     DHTNode node = chord[index];
@@ -159,6 +161,7 @@ unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
     unsigned min_diff = 0xFFFFFFFF;
     unsigned k = 0;
 
+    // Atravessa a ftb procurando a entrada com menor diff
     for (unsigned i = 0; i < (log2(max_index) + 1); i++) {
         unsigned d = diff(key, node.fingertb[i]);
         if (d < min_diff) {
@@ -170,7 +173,7 @@ unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
     return node.fingertb[k];
 }
 
-
+// Determina se a chave pertence ao nodo
 bool belongs_to(map<unsigned, DHTNode>& chord, unsigned target, unsigned key)
 {
     DHTNode node = chord[target];
@@ -181,6 +184,8 @@ bool belongs_to(map<unsigned, DHTNode>& chord, unsigned target, unsigned key)
     return node.index >= key;
 }
 
+
+// Insere um valor na rede
 void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
 {
     if (key > max_index)
@@ -197,16 +202,21 @@ void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
 }
 
 
+// Procura por um valor na rede
 void lookup(map<unsigned, DHTNode>& chord, unsigned index, unsigned key, unsigned timestamp)
 {
     vector<unsigned> jumps;
+
     unsigned target = index;
     jumps.push_back(target);
+    
+    // Enquanto não achou o dono, fica pulando
     while(!belongs_to(chord, target, key)) {
         target = get_entry(chord, target, key);
         jumps.push_back(target);
     }
 
+    // Imprime
     cout << timestamp << " L " << key << " " << '{';
     unsigned i;
     for (i = 0; i < jumps.size() - 1; i++)

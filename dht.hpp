@@ -40,5 +40,3 @@ void leave(map<unsigned, DHTNode>& chord, unsigned index);
 void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key);
 
 void lookup(map<unsigned, DHTNode>& chord, unsigned index, unsigned key, unsigned timestamp);
-
-void print_ftb(DHTNode& node);
