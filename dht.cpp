@@ -73,7 +73,7 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
     // Cria o novo nodo
     DHTNode new_node = DHTNode(index, false);
 
-    if (next_node.first) {
+    if (next_node.first && next_node.index > index) {
         first = index;
         next_node.first = false;
         new_node.first = true;
@@ -102,6 +102,8 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
     // Adiciona o nodo na rede
     chord[index] = new_node;
     update_fingertb(chord);
+
+    cout << first << endl;
 }
 
 
@@ -135,6 +137,8 @@ void leave(map<unsigned, DHTNode>& chord, unsigned index)
     // Apaga ele da rede
     chord.erase(index);
     update_fingertb(chord);
+
+    cout << first << endl;
 }
 
 
@@ -193,9 +197,16 @@ void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
 
     update_fingertb(chord);
 
+    unsigned prev_target;
     unsigned target = index;
     while(!belongs_to(chord, target, key)) {
+        prev_target = target;
         target = get_entry(chord, target, key);
+
+        if (prev_target > target) {
+            target = chord[prev_target].next;
+            break;
+        }
     }
 
     chord[target].keys.insert(key);
