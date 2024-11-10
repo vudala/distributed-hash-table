@@ -45,7 +45,8 @@ int main()
             leave(chord, op.index);
         }
         else if (op.op == 'I') {
-            insert(chord, op.index, op.key);
+            continue;
+            //insert(chord, op.index, op.key);
         }
         else if (op.op == 'L') {
             lookup(chord, op.index, op.key, op.timestamp);

@@ -7,7 +7,7 @@ using namespace std;
 
 
 unsigned first = 0;
-unsigned max_index = 0;
+unsigned max_node = 0;
 
 unsigned log2(unsigned x)
 {
@@ -40,10 +40,10 @@ void update_fingertb(map<unsigned, DHTNode>& chord)
 {
     for (auto itr = chord.begin(); itr != chord.end(); itr++) {
         DHTNode& n = (*itr).second;
-        for(unsigned i = 0; i < log2(max_index) + 1; i++){
+        for(unsigned i = 0; i < log2(max_node) + 1; i++){
             auto [a, b] = get_bounds(
                 chord,
-                (n.index + pow2(i)) % pow2(log2(max_index) + 1)
+                (n.index + pow2(i)) % pow2(log2(max_node) + 1)
             );
 
             n.fingertb[i] = b;
@@ -54,8 +54,8 @@ void update_fingertb(map<unsigned, DHTNode>& chord)
 
 void join(map<unsigned, DHTNode>& chord, unsigned index)
 {
-    if (index > max_index)
-        max_index = index;
+    if (index > max_node)
+        max_node = index;
 
     if (chord.size() == 0) {
         chord[index] = DHTNode(index, true);
@@ -102,16 +102,14 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
     // Adiciona o nodo na rede
     chord[index] = new_node;
     update_fingertb(chord);
-
-    cout << first << endl;
 }
 
 
 void leave(map<unsigned, DHTNode>& chord, unsigned index)
 {
     // Se é o maior nodo que está saindo, o anterior a ele agora é o maior
-    if (index == max_index)
-        max_index = chord[max_index].prev;
+    if (index == max_node)
+        max_node = chord[max_node].prev;
 
     // Determina a vizinhança do nodo que está saindo
     DHTNode& node = chord[index];
@@ -137,8 +135,6 @@ void leave(map<unsigned, DHTNode>& chord, unsigned index)
     // Apaga ele da rede
     chord.erase(index);
     update_fingertb(chord);
-
-    cout << first << endl;
 }
 
 
@@ -146,7 +142,7 @@ void print_ftb(DHTNode& node)
 {
     cout << '{';
     unsigned i;
-    for (i = 0; i <= log2(max_index) - 1; i++)
+    for (i = 0; i <= log2(max_node) - 1; i++)
         cout << node.fingertb[i] << ',';
     cout << node.fingertb[i] << '}';
 }
@@ -166,13 +162,16 @@ unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
     unsigned k = 0;
 
     // Atravessa a ftb procurando a entrada com menor diff
-    for (unsigned i = 0; i < (log2(max_index) + 1); i++) {
+    for (unsigned i = 0; i < (log2(max_node) + 1); i++) {
         unsigned d = diff(key, node.fingertb[i]);
         if (d < min_diff) {
             min_diff = d;
             k = i;
         }
     };
+
+    if (node.fingertb[0] < index)
+        k = 0;
 
     return node.fingertb[k];
 }
@@ -182,34 +181,16 @@ bool belongs_to(map<unsigned, DHTNode>& chord, unsigned target, unsigned key)
 {
     DHTNode node = chord[target];
 
-    if (node.first && node.prev < key)
+    if (key == target)
         return true;
 
-    return node.index >= key;
-}
+    if (key < target && key > node.prev)
+        return true;
 
+    if (key > max_node && node.first)
+        return true;
 
-// Insere um valor na rede
-void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
-{
-    if (key > max_index)
-        max_index = key;
-
-    update_fingertb(chord);
-
-    unsigned prev_target;
-    unsigned target = index;
-    while(!belongs_to(chord, target, key)) {
-        prev_target = target;
-        target = get_entry(chord, target, key);
-
-        if (prev_target > target) {
-            target = chord[prev_target].next;
-            break;
-        }
-    }
-
-    chord[target].keys.insert(key);
+    return false;
 }
 
 
@@ -220,7 +201,7 @@ void lookup(map<unsigned, DHTNode>& chord, unsigned index, unsigned key, unsigne
 
     unsigned target = index;
     jumps.push_back(target);
-    
+
     // Enquanto não achou o dono, fica pulando
     while(!belongs_to(chord, target, key)) {
         target = get_entry(chord, target, key);
