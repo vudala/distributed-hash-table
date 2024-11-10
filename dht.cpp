@@ -54,9 +54,11 @@ void update_fingertb(map<unsigned, DHTNode>& chord)
 
 void join(map<unsigned, DHTNode>& chord, unsigned index)
 {
+    // Atualiza o nodo máx
     if (index > max_node)
         max_node = index;
 
+    // Se a rede ainda está vazia
     if (chord.size() == 0) {
         chord[index] = DHTNode(index, true);
         first = index;
@@ -73,13 +75,14 @@ void join(map<unsigned, DHTNode>& chord, unsigned index)
     // Cria o novo nodo
     DHTNode new_node = DHTNode(index, false);
 
+    // Se estiver sendo inserido antes do primeiro nodo, ele agora é o primeiro
     if (next_node.first && next_node.index > index) {
         first = index;
         next_node.first = false;
         new_node.first = true;
     }
 
-    // Atualiza os limites dos nodos
+    // Atualiza os vizinhoss dos nodos
     new_node.prev = prev;
     new_node.next = next;
 
@@ -170,6 +173,8 @@ unsigned get_entry(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
         }
     };
 
+    // Caso a primeira entrada da finger table (prox nodo), seja menor que o nodo
+    // atual, significa que está loopando
     if (node.fingertb[0] < index)
         k = 0;
 
@@ -191,6 +196,24 @@ bool belongs_to(map<unsigned, DHTNode>& chord, unsigned target, unsigned key)
         return true;
 
     return false;
+}
+
+
+// Procura por um valor na rede
+void insert(map<unsigned, DHTNode>& chord, unsigned index, unsigned key)
+{
+    vector<unsigned> jumps;
+
+    unsigned target = index;
+
+    // Enquanto não achou o dono, fica pulando
+    while(!belongs_to(chord, target, key)) {
+        target = get_entry(chord, target, key);
+    }
+
+    // Atribui o valor
+    DHTNode& node = chord[target];
+    node.keys.insert(index);
 }
 
 
